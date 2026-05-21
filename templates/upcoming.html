@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>All Upcoming Contests</h1>
+
+{% for contest in upcoming_contests %}
+<div>
+
+    <h3>{{contest.name}}</h3>
+
+    <p>{{contest.platform}}</p>
+
+    <p>{{contest.start_date}}</p>
+
+</div>
+<hr>
+
+{% endfor %}
+
+</body>
+</html>

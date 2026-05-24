@@ -4,8 +4,6 @@
 <head>
     <title>Contest Insights</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
 
         body{
@@ -72,6 +70,111 @@
             color:#38bdf8;
         }
 
+        .contests-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+            gap:20px;
+            margin-bottom:20px;
+        }
+
+        .contest-card{
+            background:#0f172a;
+            border:2px solid #334155;
+            padding:20px;
+            border-radius:10px;
+            transition:all 0.3s ease;
+        }
+
+        .contest-card:hover{
+            border-color:#38bdf8;
+            box-shadow:0 0 15px rgba(56, 189, 248, 0.3);
+            transform:translateY(-5px);
+        }
+
+        .platform-badge{
+            display:inline-block;
+            background:#38bdf8;
+            color:#0f172a;
+            padding:5px 12px;
+            border-radius:20px;
+            font-size:12px;
+            font-weight:bold;
+            margin-bottom:10px;
+        }
+
+        .contest-card h3{
+            margin:10px 0;
+            font-size:18px;
+            color:#fff;
+        }
+
+        .contest-card p{
+            margin:8px 0;
+            font-size:14px;
+            color:#cbd5e1;
+        }
+
+        .date, .duration, .day{
+            padding:5px 0;
+        }
+
+        .view-all{
+            display:inline-block;
+            background:#38bdf8;
+            color:#0f172a;
+            padding:10px 20px;
+            border-radius:8px;
+            text-decoration:none;
+            font-weight:bold;
+            transition:all 0.3s ease;
+        }
+
+        .view-all:hover{
+            background:#0ea5e9;
+            transform:scale(1.05);
+        }
+
+        .platform-stats{
+            display:flex;
+            flex-direction:column;
+            gap:20px;
+        }
+
+        .stat-bar{
+            display:flex;
+            align-items:center;
+            gap:15px;
+        }
+
+        .stat-label{
+            min-width:120px;
+            font-weight:bold;
+            color:#e2e8f0;
+        }
+
+        .stat-value{
+            min-width:80px;
+            text-align:right;
+            font-size:18px;
+            font-weight:bold;
+            color:#38bdf8;
+        }
+
+        .stat-bar-bg{
+            flex:1;
+            height:30px;
+            background:#0f172a;
+            border-radius:5px;
+            overflow:hidden;
+            border:1px solid #334155;
+        }
+
+        .stat-bar-fill{
+            height:100%;
+            background:linear-gradient(90deg, #38bdf8, #0ea5e9);
+            transition:width 0.3s ease;
+        }
+
     </style>
 </head>
 
@@ -105,86 +208,92 @@
 
 <h2>Upcoming Contests</h2>
 
-<table>
-
-<tr>
-<th>Name</th>
-<th>Platform</th>
-<th>Date</th>
-</tr>
+<div class="contests-grid">
 
 {% for contest in upcoming_contests %}
 
-<tr>
+<div class="contest-card">
 
-<td>{{contest.name}}</td>
+<div class="platform-badge">{{contest.platform}}</div>
 
-<td>{{contest.platform}}</td>
+<h3>{{contest.contest_name}}</h3>
 
-<td>{{contest.start_date}}</td>
+<p class="date"><strong>Date:</strong> {{contest.start_date.strftime('%Y-%m-%d %H:%M')}}</p>
 
-</tr>
+{% if contest.duration_min %}
+<p class="duration"><strong>Duration:</strong> {{contest.duration_min|int}} mins</p>
+{% endif %}
+
+<p class="day"><strong>Day:</strong> {{contest.day_of_week}}</p>
+
+</div>
 
 {% endfor %}
 
-</table>
+</div>
 
 <br>
 
-<a href="/upcoming">View all contests</a>
+<a href="/upcoming" class="view-all">View All Contests →</a>
 
 </div>
 
 
 <div class="section">
 
-<h2>Contest Distribution</h2>
+<h2>Contests by Platform</h2>
 
-<canvas id="platformChart"></canvas>
+<div class="platform-stats">
+
+{% for platform, count in platform_counts.items() %}
+
+<div class="stat-bar">
+
+<div class="stat-label">{{platform}}</div>
+
+<div class="stat-value">{{count}}</div>
+
+<div class="stat-bar-bg">
+
+<div class="stat-bar-fill" style="width: {{count/platform_counts.values()|max*100}}%"></div>
 
 </div>
 
+</div>
 
+{% endfor %}
 
-<script>
+</div>
 
-fetch("/insights")
+</div>
 
-.then(response=>response.json())
+<div class="section">
 
-.then(data=>{
+<h2>Avg Duration by Platform</h2>
 
-new Chart(
-document.getElementById("platformChart"),
+<div class="platform-stats">
 
-{
+{% for platform, duration in duration_stats.items() %}
 
-type:"bar",
+<div class="stat-bar">
 
-data:{
+<div class="stat-label">{{platform}}</div>
 
-labels:Object.keys(
-data.platform_counts
-),
+<div class="stat-value">{{duration}} min</div>
 
-datasets:[{
+<div class="stat-bar-bg">
 
-label:"Contests",
+<div class="stat-bar-fill" style="width: {{duration/duration_stats.values()|max*100}}%"></div>
 
-data:Object.values(
-data.platform_counts
-)
+</div>
 
-}]
-}
+</div>
 
-}
+{% endfor %}
 
-)
+</div>
 
-})
-
-</script>
+</div>
 
 </body>
 </html>

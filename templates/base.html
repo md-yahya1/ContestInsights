@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Contest Insights{% endblock %}</title>
+    
+    <!-- SEO & Metadata -->
+    <meta name="description" content="Dashboard for tracking programming contests across LeetCode, Codeforces, AtCoder, and CodeChef.">
+    <meta name="theme-color" content="#090d16">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js (used in dashboard/insights) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Custom Style System -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Master Header -->
+        <header>
+            <div class="brand-section">
+                <a href="/" style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="brand-logo">
+                        <!-- Trophy icon SVG -->
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6v5Zm0 0V3H18v6m0 0h1.5a2.5 2.5 0 0 0 0-5H18v5Zm-6 6v4m0 0H9m3 0h3m-6-7h6a3 3 0 0 1 3 3v1a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6v-1a3 3 0 0 1 3-3Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="brand-title">
+                        <h1>Contest Insights</h1>
+                        <p>Aggregated Competitive Coding Schedule</p>
+                    </div>
+                </a>
+            </div>
+            
+            <nav class="nav-pills">
+                <a href="/" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+                    <i data-lucide="layout-dashboard" style="display: inline-block; width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;"></i>
+                    Dashboard
+                </a>
+                <a href="/upcoming" class="nav-pill {% if active_page == 'upcoming' %}active{% endif %}" id="nav-upcoming">
+                    <i data-lucide="calendar" style="display: inline-block; width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;"></i>
+                    All Upcoming
+                </a>
+            </nav>
+        </header>
+
+        <!-- Main Content Slot -->
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Master Footer -->
+        <footer>
+            <p>Contest Insights Dashboard &copy; 2026. Made for competitive programmers.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem;">Data updated automatically from LeetCode, Codeforces, AtCoder, and CodeChef.</p>
+        </footer>
+    </div>
+
+    <!-- Global Scripts -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // 1. Timezone conversion and dynamic calendar utility
+        document.addEventListener("DOMContentLoaded", () => {
+            formatAllTimes();
+            initCountdown();
+        });
+
+        function formatAllTimes() {
+            const timeElements = document.querySelectorAll(".local-time");
+            timeElements.forEach(el => {
+                const utcStr = el.getAttribute("data-utc");
+                if (!utcStr) return;
+                
+                try {
+                    // Normalize standard pandas date output (e.g., '2026-06-27 21:00:00') into valid ISO
+                    let normalizedStr = utcStr.replace(' ', 'T');
+                    if (!normalizedStr.endsWith('Z') && !normalizedStr.includes('+')) {
+                        // Assuming the dataset date is in UTC timezone
+                        normalizedStr += 'Z';
+                    }
+                    
+                    const dateObj = new Date(normalizedStr);
+                    if (isNaN(dateObj.getTime())) {
+                        el.textContent = utcStr;
+                        return;
+                    }
+                    
+                    // Format option details
+                    const options = {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    };
+                    
+                    el.textContent = dateObj.toLocaleDateString(undefined, options);
+                    
+                    // Set relative time title/tooltip
+                    const relativeText = getRelativeTimeString(dateObj);
+                    el.setAttribute("title", `Relative: ${relativeText}\nUTC: ${utcStr}`);
+                    
+                    // If element has a subtext target, update it
+                    const parentRow = el.closest('tr') || el.closest('.contest-card');
+                    if (parentRow) {
+                        const relativeEl = parentRow.querySelector('.relative-time-badge');
+                        if (relativeEl) {
+                            relativeEl.textContent = relativeText;
+                            if (relativeText.includes("ago")) {
+                                relativeEl.style.color = "var(--text-muted)";
+                            } else if (relativeText.includes("Soon") || relativeText.includes("hours")) {
+                                relativeEl.style.color = "var(--warning)";
+                            } else {
+                                relativeEl.style.color = "var(--success)";
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Time conversion error:", e);
+                }
+            });
+        }
+
+        function getRelativeTimeString(date) {
+            const now = new Date();
+            const diffMs = date - now;
+            const diffMins = Math.round(diffMs / 60000);
+            const diffHours = Math.round(diffMins / 60);
+            const diffDays = Math.round(diffHours / 24);
+
+            if (Math.abs(diffMins) < 1) return "Just now";
+            
+            if (diffMs > 0) {
+                // Future
+                if (diffMins < 60) return `Starts in ${diffMins}m`;
+                if (diffHours < 24) return `Starts in ${diffHours}h ${diffMins % 60}m`;
+                return `Starts in ${diffDays} days`;
+            } else {
+                // Past
+                const absMins = Math.abs(diffMins);
+                const absHours = Math.abs(diffHours);
+                const absDays = Math.abs(diffDays);
+                
+                if (absMins < 60) return `${absMins}m ago`;
+                if (absHours < 24) return `${absHours}h ago`;
+                return `${absDays} days ago`;
+            }
+        }
+
+        // Calendar link generator helper (used inside tables and cards)
+        function generateGoogleCalendarLink(title, startIsoStr, durationMin, platform) {
+            try {
+                let normalizedStr = startIsoStr.replace(' ', 'T');
+                if (!normalizedStr.endsWith('Z') && !normalizedStr.includes('+')) {
+                    normalizedStr += 'Z';
+                }
+                const startDate = new Date(normalizedStr);
+                if (isNaN(startDate.getTime())) return '#';
+                
+                const endDate = new Date(startDate.getTime() + (durationMin || 120) * 60000);
+                
+                const formatCalendarDate = (date) => {
+                    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                };
+                
+                const datesParam = `${formatCalendarDate(startDate)}/${formatCalendarDate(endDate)}`;
+                const textParam = encodeURIComponent(`${platform}: ${title}`);
+                const detailsParam = encodeURIComponent(`Coding contest on ${platform}.\nDuration: ${durationMin || 120} minutes.\nGood luck!`);
+                
+                return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${textParam}&dates=${datesParam}&details=${detailsParam}`;
+            } catch(e) {
+                return '#';
+            }
+        }
+
+        // 2. Interactive live countdown timer for the Hero component
+        let countdownInterval;
+        function initCountdown() {
+            const timerContainer = document.getElementById("hero-timer");
+            if (!timerContainer) return;
+
+            const startStr = timerContainer.getAttribute("data-start");
+            if (!startStr) return;
+
+            let normalizedStr = startStr.replace(' ', 'T');
+            if (!normalizedStr.endsWith('Z') && !normalizedStr.includes('+')) {
+                normalizedStr += 'Z';
+            }
+            const startDate = new Date(normalizedStr);
+            if (isNaN(startDate.getTime())) return;
+
+            const daysEl = document.getElementById("cd-days");
+            const hoursEl = document.getElementById("cd-hours");
+            const minsEl = document.getElementById("cd-mins");
+            const secsEl = document.getElementById("cd-secs");
+
+            function update() {
+                const now = new Date();
+                const diffMs = startDate - now;
+
+                if (diffMs <= 0) {
+                    document.getElementById("hero-timer-label").textContent = "CONTEST IN PROGRESS OR COMPLETED";
+                    timerContainer.style.opacity = "0.5";
+                    clearInterval(countdownInterval);
+                    return;
+                }
+
+                const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+                if (daysEl) daysEl.textContent = String(days).padStart(2, '0');
+                if (hoursEl) hoursEl.textContent = String(hours).padStart(2, '0');
+                if (minsEl) minsEl.textContent = String(mins).padStart(2, '0');
+                if (secsEl) secsEl.textContent = String(secs).padStart(2, '0');
+            }
+
+            update();
+            countdownInterval = setInterval(update, 1000);
+        }
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
